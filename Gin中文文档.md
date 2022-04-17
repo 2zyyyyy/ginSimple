@@ -425,23 +425,270 @@ func main() {
 
 #### Json 数据解析和绑定
 
+- 客户端传参，后端接收并解析到结构体
 
+  ```go
+  package main
+  
+  import (
+  	"github.com/gin-gonic/gin"
+  	"net/http"
+  )
+  
+  // Login 定义接收数据的结构体
+  type Login struct {
+  	// binding:"required" 修饰的字段 若接收为空值 则报错 是必须字段
+  	User     string `form:"username" json:"user" uri:"user" xml:"user" binding:"required"`
+  	Password string `form:"password" json:"password" uri:"password" xml:"password" binding:"required"`
+  }
+  
+  func main() {
+  	r := gin.Default()
+  	// JSON 绑定
+  	r.POST("loginJson", func(context *gin.Context) {
+  		// 声明接收的变量
+  		var json Login
+  		// 将request的body中的数据，自动按照JSON格式解析到结构体
+  		if err := context.ShouldBindJSON(&json); err != nil {
+  			// 返回错误信息
+  			// gin.H封装了生成json数据的工具
+  			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+  			return
+  		}
+  		// 判断用户名密码是否正确
+  		if json.User != "admin" || json.Password != "123456" {
+  			context.JSON(http.StatusBadRequest, gin.H{"status": "304"})
+  			return
+  		}
+  		context.JSON(http.StatusOK, gin.H{"status": "200"})
+  	})
+  	err := r.Run(":8080")
+  	if err != nil {
+  		return
+  	}
+  }
+  ```
 
-
+  ![image-20220417113234084](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417113234084.png)
 
 #### 表单数据解析和绑定
 
+```go
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <form action="http://localhost:8080/loginForm" method="post" enctype="application/x-www-form-urlencoded">
+        用户名<input type="text" name="username"><br>
+        密码<input type="password" name="password">
+        <input type="submit" value="提交">
+    </form>
+</body>
+</html>
+```
 
+```go
+package main
 
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
 
+// Form 数据解析和绑定
 
+type Login struct {
+	// binding:"required" 修饰的字段 若接收为空值 则报错 是必须字段
+	User     string `form:"username" json:"user" uri:"user" xml:"user" binding:"required"`
+	Password string `form:"password" json:"password" uri:"password" xml:"password" binding:"required"`
+}
 
+func main() {
+	r := gin.Default()
+	r.POST("/loginForm", func(context *gin.Context) {
+		// 声明接收的变量
+		var form Login
+		// Bind()默认解析并绑定form格式
+		// 根据请求头中的content—type自动推断
+		if err := context.Bind(&form); err != nil {
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		// 判断用户名密码是否正确
+		if form.User != "admin" || form.Password != "123456" {
+			context.JSON(http.StatusBadRequest, gin.H{"status": "304"})
+			return
+		}
+		context.JSON(http.StatusOK, gin.H{"status": "200"})
+	})
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
+
+![image-20220417174559693](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417174559693.png)
+
+​			![image-20220417175311498](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417175311498.png)
 
 #### URL数据解析和绑定
 
+```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+
+// Url 数据解析和绑定
+
+type Login struct {
+	// binding:"required" 修饰的字段 若接收为空值 则报错 是必须字段
+	User     string `form:"username" json:"user" uri:"user" xml:"user" binding:"required"`
+	Password string `form:"password" json:"password" uri:"password" xml:"password" binding:"required"`
+}
+
+func main() {
+	r := gin.Default()
+	r.GET("/:user/:password", func(context *gin.Context) {
+		// 声明接收的变量
+		var login Login
+		// Bind()默认解析并绑定form格式
+		// 根据请求头中的content—type自动推断
+		if err := context.ShouldBindUri(&login); err != nil {
+			context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		// 判断用户名密码是否正确
+		if login.User != "admin" || login.Password != "123456" {
+			context.JSON(http.StatusBadRequest, gin.H{"status": "304"})
+			return
+		}
+		context.JSON(http.StatusOK, gin.H{"status": "200"})
+	})
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
+
+![image-20220417184457127](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417184457127.png)
+
+### Gin 渲染
+
+#### 各种数据格式的响应
+
+- json、结构体、XML、YAML类似于java的properties、ProtoBuf
+
+  ```go
+  package main
+  
+  import (
+  	"github.com/gin-gonic/gin"
+  	"github.com/gin-gonic/gin/testdata/protoexample"
+  )
+  
+  // 多种相应格式
+  func main() {
+  	r := gin.Default()
+  	// 1.json
+  	r.GET("/someJson", func(context *gin.Context) {
+  		context.JSON(200, gin.H{"message": "someJson", "status": 200})
+  	})
+  	// 2.结构体响应
+  	r.GET("/someStruct", func(context *gin.Context) {
+  		var msg struct {
+  			Name    string
+  			Message string
+  			Number  int
+  		}
+  		msg.Name = "admin"
+  		msg.Message = "struct message"
+  		msg.Number = 9527
+  		context.JSON(200, msg)
+  	})
+  	// 3.xml
+  	r.GET("/someXML", func(context *gin.Context) {
+  		context.XML(200, gin.H{"message": "xml message"})
+  	})
+  	// 4.YAML
+  	r.GET("/someYAML", func(context *gin.Context) {
+  		context.YAML(200, gin.H{"message": "YAML message"})
+  	})
+  	// 5.protobuf格式 Google开发的高效存储读取的工具
+  	// 数组？切片？如果在机构建一个传输格式，应该是什么格式
+  	r.GET("/someProtoBuf", func(context *gin.Context) {
+  		resp := []int64{int64(1), int64(2)}
+  		// 定义数据
+  		label := "label"
+  		// 传protobuf格式的诗句
+  		data := &protoexample.Test{
+  			Label: &label,
+  			Reps:  resp,
+  		}
+  		context.ProtoBuf(200, data)
+  	})
+  	err := r.Run(":8080")
+  	if err != nil {
+  		return
+  	}
+  }
+  ```
+
+  ![image-20220417225132459](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417225132459.png)
+
+![image-20220417225200060](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417225200060.png)
+
+![image-20220417225229346](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417225229346.png)
+
+![image-20220417225428674](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417225428674.png)
+
+![image-20220417225607720](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417225607720.png)
+
+#### HTML模板渲染
+
+- gin支持加载HTML模板, 然后根据模板参数进行配置并返回相应的数据，本质上就是字符串替换
+
+- LoadHTMLGlob()方法可以加载模板文件
+
+  ```go
+  package main
+  
+  import "github.com/gin-gonic/gin"
+  
+  func main() {
+  	r := gin.Default()
+  	r.LoadHTMLFiles("./user/index.html")
+  	//r.LoadHTMLGlob("htmlTemplate/*")
+  	r.GET("/index", func(context *gin.Context) {
+  		context.HTML(200, "user/index.html", gin.H{"title": "万里测试", "address": "www.google.com"})
+  	})
+  	err := r.Run(":8080")
+  	if err != nil {
+  		return
+  	}
+  }
+  ```
+
+  ![image-20220417231038205](C:\Users\73554\AppData\Roaming\Typora\typora-user-images\image-20220417231038205.png)
 
 
 
+#### 重定向
+
+
+
+
+
+#### 同步异步
 
 
 
