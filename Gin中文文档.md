@@ -752,24 +752,341 @@ func main() {
 - 所有请求都经过此中间件
 
   ```go
+  package main
   
+  import (
+  	"fmt"
+  	"github.com/gin-gonic/gin"
+  	"time"
+  )
+  
+  // 全局中间件
+  
+  // MiddleWare 定义中间件
+  func MiddleWare() gin.HandlerFunc {
+  	return func(context *gin.Context) {
+  		t := time.Now()
+  		fmt.Println("中间件开始执行...")
+  		// 设置变量到 context 的 key 中，可以通过 get()获取
+  		context.Set("request", "中间件")
+  		status := context.Writer.Status()
+  		fmt.Println("中间件执行结束!", status)
+  		t2 := time.Since(t)
+  		fmt.Println("time:", t2)
+  	}
+  }
+  
+  func main() {
+  	r := gin.Default()
+  	// 注册中间件
+  	r.Use(MiddleWare())
+  	// {} 代码规范
+  	{
+  		r.GET("/middleware", func(context *gin.Context) {
+  			// 取值
+  			request, _ := context.Get("request")
+  			fmt.Println("request:", request)
+  			// 页面接收
+  			context.JSON(200, gin.H{"request": request})
+  		})
+  	}
+  	err := r.Run(":8080")
+  	if err != nil {
+  		return
+  	}
+  }
   ```
-
-  
 
 #### Next()方法
 
+```go
+package main
 
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"time"
+)
+
+// MiddleWare 定义中间件
+func MiddleWare() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		t := time.Now()
+		fmt.Println("中间件开始执行...")
+		// 设置变量到 context 的 key 中，可以通过 get()获取
+		context.Set("request", "中间件")
+		// 执行函数
+		context.Next()
+		// 中间件执行完的后续动作
+		status := context.Writer.Status()
+		fmt.Println("中间件执行结束!", status)
+		t2 := time.Since(t)
+		fmt.Println("time:", t2)
+	}
+}
+
+func main() {
+	// 默认使用了2个中间件Logger(), Recovery()
+	r := gin.Default()
+	// 注册中间件
+	r.Use(MiddleWare())
+	// {} 代码规范
+	{
+		r.GET("/middleware", func(context *gin.Context) {
+			// 取值
+			request, _ := context.Get("request")
+			fmt.Println("request:", request)
+			// 页面接收
+			context.JSON(200, gin.H{"request": request})
+		})
+	}
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
 
 #### 局部中间件
 
+```go
+package main
 
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"time"
+)
+
+// 局部中间件
+
+// MiddleWare 定义中间件
+func MiddleWare() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		t := time.Now()
+		fmt.Println("中间件开始执行...")
+		// 设置变量到 context 的 key 中，可以通过 get()获取
+		context.Set("request", "中间件")
+		// 执行函数
+		context.Next()
+		// 中间件执行完的后续动作
+		status := context.Writer.Status()
+		fmt.Println("中间件执行结束!", status)
+		t2 := time.Since(t)
+		fmt.Println("time:", t2)
+	}
+}
+
+func main() {
+	// 默认使用了2个中间件Logger(), Recovery()
+	r := gin.Default()
+	// 局部中间件
+	r.GET("/middleware", MiddleWare(), func(context *gin.Context) {
+		// 取值
+		request, _ := context.Get("request")
+		fmt.Println("request:", request)
+		// 页面接收
+		context.JSON(200, gin.H{"request": request})
+	})
+
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
 
 #### 中间件练习
 
+```go
+package main
 
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"time"
+)
 
-#### 中间件推荐
+// 中间件
+func myTime(ctx *gin.Context) {
+	start := time.Now()
+	ctx.Next()
+	// 统计时间
+	since := time.Since(start)
+	fmt.Println("累计用时：", since)
+}
+
+func shopIndexHandler(ctx *gin.Context) {
+	time.Sleep(5 * time.Second)
+	ctx.String(http.StatusOK, "shopIndexHandler~~~")
+}
+
+func shopHomeHandler(ctx *gin.Context) {
+	time.Sleep(3 * time.Second)
+	ctx.String(http.StatusOK, "shopHomeHandler~~~")
+}
+
+func main() {
+	r := gin.Default()
+	// 注册中间件
+	r.Use(myTime)
+	shoppingGroup := r.Group("shopping")
+	{
+		shoppingGroup.GET("/index", shopIndexHandler)
+		shoppingGroup.GET("/home", shopHomeHandler)
+	}
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
+
+### 会话控制
+
+#### Cookie 介绍
+
+- HTTP是无状态协议，服务器不能记录浏览器的访问状态，也就是说服务器不能区分两次请求是否由同一个客户端发出
+- Cookie就是解决HTTP协议无状态的方案之一，中文是小甜饼的意思
+- Cookie实际上就是服务器保存在浏览器上的一段信息。浏览器有了Cookie之后，每次向服务器发送请求时都会同时将该信息发送给服务器，服务器收到请求后，就可以根据该信息处理请求
+- Cookie由服务器创建，并发送给浏览器，最终由浏览器保存
+
+**用途**
+
+- 测试服务端发送cookie给客户端，客户端请求时携带cookie
+
+#### Cookie 使用
+
+- 测试服务端发送cookie给客户端，客户端请求时携带cookie
+
+  ```go
+  package main
+  
+  import (
+  	"fmt"
+  	"github.com/gin-gonic/gin"
+  	"net/http"
+  )
+  
+  func main() {
+  	r := gin.Default()
+  	// 服务器要给客户端cookie
+  	r.GET("cookie", func(ctx *gin.Context) {
+  		cookie, err := ctx.Cookie("key_cookie")
+  		if err != nil {
+  			cookie = "notSet"
+  			// 给客户端设置cookie（1.maxAge int,单位s 2.path,cookie所在目录
+  			//3.domain string,域名 4.secure 是否只能通过HTTPS访问 4.httpOnly bool 是否允许别人通过js获取自己的cookie）
+  			ctx.SetCookie("key_cookie", "value_cookie", 60,
+  				"/", "localhost", false, true)
+  		}
+  		fmt.Printf("cookie的值为:%s\n", cookie)
+  		ctx.JSON(http.StatusOK, gin.H{"cookie": cookie})
+  	})
+  	err := r.Run(":8080")
+  	if err != nil {
+  		return
+  	}
+  }
+  ```
+
+#### Cookie 练习
+
+- 模拟实现权限验证中间件
+
+  - 有2个路由，login和home
+  - login用于设置cookie
+  - home是访问查看信息的请求
+  - 在请求home之前，先跑中间件代码，检验是否存在cookie
+
+- 访问home，会显示错误，因为权限校验未通过
+
+  ```go
+  package main
+  
+  import (
+  	"github.com/gin-gonic/gin"
+  	"net/http"
+  )
+  
+  // 模拟实现权限验证中间件
+  // 有2个路由，login和home
+  // login用于设置cookie
+  // home是访问查看信息的请求
+  // 在请求home之前，先跑中间件代码，检验是否存在cookie
+  // 访问home，会显示错误，因为权限校验未通过
+  
+  // 权限校验中间件
+  func permissionMiddleware() gin.HandlerFunc {
+  	// 获取客户端cookie并校验
+  	return func(ctx *gin.Context) {
+  		if cookie, err := ctx.Cookie("abc"); err == nil {
+  			if cookie == "123" {
+  				ctx.Next()
+  				return
+  			}
+  		}
+  		// 返回错误
+  		ctx.JSON(http.StatusUnauthorized, gin.H{"mes": "cookie 鉴权失败"})
+  		// 若验证不通过，不再调用后续的函数处理
+  		ctx.Abort()
+  		return
+  	}
+  }
+  
+  func main() {
+  	r := gin.Default()
+  	r.GET("/login", func(ctx *gin.Context) {
+  		// 设置 cookie(domain 如果设置了 localhost 浏览器不能通过 127.0.0.1 来访问 否则 cookie 会设置失败)
+  		ctx.SetCookie("abc", "123", 60, "/", "localhost", false, true)
+  		// 返回信息
+  		ctx.JSON(http.StatusOK, gin.H{"msg": "login success"})
+  	})
+  	r.GET("/home", permissionMiddleware(), func(ctx *gin.Context) {
+  		ctx.JSON(http.StatusOK, gin.H{"msg": "welcome to my home"})
+  	})
+  	err := r.Run()
+  	if err != nil {
+  		return
+  	}
+  }
+  ```
+
+  ![image-20220419141324729](https://tva1.sinaimg.cn/large/e6c9d24ely1h1f05a9ljzj213s088wgf.jpg)
+
+关于 setCookie 时 domain 设置的是 localhost，启动之后通过 127.0.0.1/login 访问来设置 cookie 失败问题的原因我从网上找了一些信息，可以参考一下：
+
+```go
+和代码无关，我访问地址有问题，我访问的是 127.0.0.1:8001，应该是localhost:8000 127.0.0.1通常是分配给“环回”或本地接口的IP地址。这是一个只能在同一主机内通信的“假”网络适配器。当您希望具有网络功能的应用程序仅为同一主机上的客户机提供服务时，通常会使用这种方法。在127.0.0.1上监听连接的进程将只接收该套接字上的本地连接。
+
+“localhost”通常是127.0.0.1 IP地址的主机名。它通常在/etc/hosts中设置(或者在%WINDIR%下的等效窗口名为“hosts”)。您可以像使用任何其他主机名一样使用它—尝试“ping localhost”，看看它是如何解析为127.0.0.1的。
+
+0.0.0.0有几个不同的含义，但是在本文中，当服务器被告知监听0.0.0.0时，这意味着“监听每个可用的网络接口”。从服务器进程的角度来看，IP地址为127.0.0.1的环回适配器与机器上的任何其他网络适配器一样，因此被告知监听0.0.0.0的服务器也将接受该接口上的连接。
+```
+
+#### 缺点
+
+- 不安全，明文
+- 增加带宽消耗
+- 可以被禁用
+- cookie有上限
+
+#### Sessions
+
+gorilla/sessions为自定义session后端提供cookie和文件系统session以及基础结构。
+
+主要功能是：
+
+- 简单的API：将其用作设置签名（以及可选的加密）cookie的简便方法。
+- 内置的后端可将session存储在cookie或文件系统中。
+- Flash消息：一直持续读取的session值。
+- 切换session持久性（又称“记住我”）和设置其他属性的便捷方法。
+- 旋转身份验证和加密密钥的机制。
+- 每个请求有多个session，即使使用不同的后端也是如此。
+- 自定义session后端的接口和基础结构：可以使用通用API检索并批量保存来自不同商店的session。
+
+代码：
 
 
 

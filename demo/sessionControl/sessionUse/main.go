@@ -9,7 +9,7 @@ import (
 func main() {
 	r := gin.Default()
 	// 服务器要给客户端cookie
-	r.GET("cookie", func(ctx *gin.Context) {
+	r.GET("/cookie", func(ctx *gin.Context) {
 		cookie, err := ctx.Cookie("key_cookie")
 		if err != nil {
 			cookie = "notSet"
