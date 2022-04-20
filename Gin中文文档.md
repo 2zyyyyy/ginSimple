@@ -1088,6 +1088,235 @@ gorilla/sessions为自定义session后端提供cookie和文件系统session以�
 
 代码：
 
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/gorilla/sessions"
+	"net/http"
+)
+
+// sessions
+
+// 初始化一个cookie存储对象
+var store = sessions.NewCookieStore([]byte("test-secret"))
+
+func main() {
+	http.HandleFunc("/save", SaveSession)
+	http.HandleFunc("/get", GetSession)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		fmt.Println("HTTP server failed, err:", err)
+		return
+	}
+}
+
+func SaveSession(w http.ResponseWriter, r *http.Request) {
+	// 获取一个session对象 session-name是session的名字
+	session, err := store.Get(r, "session-name")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// 在session中存储值
+	session.Values["foo"] = "bar"
+	session.Values[42] = 43
+	// 保存更改
+	_ = session.Save(r, w)
+}
+
+func GetSession(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "session-name")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	foo := session.Values["foo"]
+	fmt.Println(foo)
+}
+```
+
+### 参数验证
+
+#### 结构体验证
+
+用gin框架的数据验证，可以不用解析数据，减少if else，会简洁许多。
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"time"
+)
+
+// 结构体验证
+
+type Person struct {
+	// 不能为空并且大于10
+	Age      int       `form:"age" binding:"required,gt=10"`
+	Name     string    `form:"name" binding:"required"`
+	Birthday time.Time `form:"birthday" time_format:"2006-01-02" time_utc:"1"`
+}
+
+func main() {
+	r := gin.Default()
+	r.GET("/2zyyyyy", func(ctx *gin.Context) {
+		var person Person
+		if err := ctx.ShouldBind(&person); err != nil {
+			ctx.JSON(500, gin.H{"msg": err})
+			return
+		}
+		ctx.JSON(200, fmt.Sprintf("%#v\n", person))
+	})
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
+
+#### 自定义验证
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
+	"net/http"
+)
+
+// Login 对绑定解析到结构体上的参数，自定义验证功能
+// 比如我们需要对URL的接收参数进行判断，判断用户名是否为root如果是root通过否则返回false
+type Login struct {
+	User     string `uri:"user" validate:"checkName"`
+	Password string `uri:"password"`
+}
+
+// 自定义验证函数
+func checkName(fl validator.FieldLevel) bool {
+	if fl.Field().String() != "root" {
+		return false
+	}
+	return true
+}
+
+func main() {
+	r := gin.Default()
+	validate := validator.New()
+	r.GET("/:user/:password", func(ctx *gin.Context) {
+		var login Login
+		// 注册自定义函数，与struct tag 关联起来
+		err := validate.RegisterValidation("checkName", checkName)
+		if err := ctx.ShouldBindUri(&login); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		err = validate.Struct(login)
+		if err != nil {
+			for _, err := range err.(validator.ValidationErrors) {
+				fmt.Println(err)
+			}
+			return
+		}
+		fmt.Println("success")
+	})
+	err := r.Run(":8080")
+	if err != nil {
+		return
+	}
+}
+```
+
+#### 自定义验证 V10
+
+Validator 是基于 tag（标记）实现结构体和单个字段的值验证库，它包含以下功能：
+
+- 使用验证 tag（标记）或自定义验证器进行跨字段和跨结构体验证。
+- 关于 slice、数组和 map，允许验证多维字段的任何或所有级别。
+- 能够深入 map 键和值进行验证。
+- 通过在验证之前确定接口的基础类型来处理类型接口。
+- 处理自定义字段类型（如 sql 驱动程序 Valuer）。
+- 别名验证标记，它允许将多个验证映射到单个标记，以便更轻松地定义结构体上的验证。
+- 提取自定义的字段名称，例如，可以指定在验证时提取 JSON 名称，并在生成的 FieldError 中使用该名称。
+- 可自定义 i18n 错误消息。
+- Web 框架 gin 的默认验证器。
+
+**安装**
+
+> ```go
+> go get github.com/go-playground/validator/v10
+> ```
+
+**变量验证**
+
+Var 方法使用 tag（标记）验证方式验证单个变量。
+
+```go
+func (*validator.Validate).Var(field interface{}, tag string) error
+```
+
+它接收一个 interface{} 空接口类型的 field 和一个 string 类型的 tag，返回传递的非法值得无效验证错误，否则将 nil 或 ValidationErrors 作为错误。如果错误不是 nil，则需要断言错误去访问错误数组，例如：
+
+```go
+validationErrors := err.(validator.ValidationErrors)
+```
+
+如果是验证数组、slice 和 map，可能会包含多个错误。
+
+示例代码：
+
+```go
+func main() {
+  validate := validator.New()
+  // 验证变量
+  email := "admin#admin.com"
+  err := validate.Var(email, "required,email")
+  if err != nil {
+    validationErrors := err.(validator.ValidationErrors)
+    fmt.Println(validationErrors)
+    // output: Key: '' Error:Field validation for '' failed on the 'email' tag
+    return
+  }
+}
+```
+
+**结构体验证**
+
+结构体验证结构体公开的字段，并自动验证嵌套结构体，除非另有说明。
+
+```go
+func (*validator.Validate).Struct(s interface{}) error
+```
+
+它接收一个 interface{} 空接口类型的 s，返回传递的非法值得无效验证错误，否则将 nil 或 ValidationErrors 作为错误。如果错误不是 nil，则需要断言错误去访问错误数组，例如：
+
+```go
+validationErrors := err.(validator.ValidationErrors)
+```
+
+实际上，Struct 方法是调用的 StructCtx 方法，因为本文不是源码讲解，所以此处不展开赘述，如有兴趣，可以查看源码。
+
+示例代码：
+
+```go
+
+```
+
+
+
+
+
+
+
+#### 多语言翻译验证
+
+
+
 
 
 
