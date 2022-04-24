@@ -8,4 +8,4 @@
 [GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
 Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
 [GIN-debug] Listening and serving HTTP on :8088
-[GIN] 2022/04/23 - 19:48:48 | 200 |       963.4µs |             ::1 | GET      "/gin-realtime-loading"
+[GIN] 2022/04/23 - 21:35:39 | 200 |            0s |             ::1 | GET      "/gin-realtime-loading"
