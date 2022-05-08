@@ -130,6 +130,13 @@ func redisZset() {
 }
 
 func main() {
+	defer func(rdb *redis.Client) {
+		err := rdb.Close()
+		if err != nil {
+			fmt.Println("rdb close failed, err:", err)
+			return
+		}
+	}(rdb)
 	err := initClient()
 	if err != nil {
 		fmt.Println("initClient() failed, err:%", err)

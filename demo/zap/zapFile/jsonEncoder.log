@@ -1,0 +1,4 @@
+{"level":"debug","ts":1651997083.2160943,"msg":"Trying to hit Get request for www.google3.com\n"}
+{"level":"error","ts":1651997083.2160943,"msg":"Error fetching URL www.google3.com : Error = Get \"www.google3.com\": unsupported protocol scheme \"\""}
+{"level":"debug","ts":1651997083.2160943,"msg":"Trying to hit Get request for https://www.sogo.com\n"}
+{"level":"info","ts":1651997083.5668073,"msg":"Success! statusCode = 200 OK for URL https://www.sogo.com"}
