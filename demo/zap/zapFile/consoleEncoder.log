@@ -1,0 +1,6 @@
+2022-05-08T19:46:31.305+0800	DEBUG	zapFile/main.go:55	Trying to hit Get request for www.google3.com
+
+2022-05-08T19:46:31.315+0800	ERROR	zapFile/main.go:58	Error fetching URL www.google3.com : Error = Get "www.google3.com": unsupported protocol scheme ""
+2022-05-08T19:46:31.315+0800	DEBUG	zapFile/main.go:55	Trying to hit Get request for https://www.sogo.com
+
+2022-05-08T19:46:31.686+0800	INFO	zapFile/main.go:64	Success! statusCode = 200 OK for URL https://www.sogo.com
